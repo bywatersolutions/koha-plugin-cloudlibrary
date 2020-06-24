@@ -155,11 +155,11 @@ $(document).ready(function(){
     if( $("body#results").length > 0 ) {
     console.log("ok");
         if( $(".loggedinusername").length == 0 ){
-            $("a[href*='ebook.yourcloudlibrary.com']'").closest('td').children('.availability').html('<td class="item_status"><span class="action">Login to see Cloud Availability</span></td>');
+            $("a[href*='ebook.yourcloudlibrary.com']").closest('td').children('.availability').html('<td class="item_status"><span class="action">Login to see Cloud Availability</span></td>');
         } else {
             var item_ids = "";
             var counter = 0;
-            $("a[href*='ebook.yourcloudlibrary.com']'").each(function(){
+            $("a[href*='ebook.yourcloudlibrary.com']").each(function(){
                 var cloud_id = $(this).attr('href').split('-').pop().split('&').shift();
                 console.log( cloud_id );
                 $(this).closest('td').children('.availability').html('<td id="'+cloud_id+'" class="item_status" ><span class="action"><img src="/plugin/Koha/Plugin/Com/ByWaterSolutions/Bibliotheca/img/spinner-small.gif"> Fetching 3M Cloud availability</span><span class="detail"></span></td>');
