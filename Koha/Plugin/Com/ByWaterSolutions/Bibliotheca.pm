@@ -14,6 +14,7 @@ use C4::Biblio;
 use C4::Output qw(&output_with_http_headers);
 use Koha::DateUtils;
 use Koha::Libraries;
+use Koha::Patrons;
 use Koha::Patron::Categories;
 use Koha::Patron::Attribute::Types;
 use Koha::Account;
@@ -582,7 +583,7 @@ sub _get_request_uri {
             if( $cloud_identifier eq 'cardnumber') {
                 $cloud_id = $patron->cardnumber;
             } elsif ( $cloud_identifier eq 'patron_attr') {
-                my $the_attr = $patron->attributes->find({ code => $self->retrieve_data('cloud_attr') });
+                my $the_attr = $patron->extended_attributes->find({ code => $self->retrieve_data('cloud_attr') });
                 $cloud_id = $the_attr->attribute if $the_attr;
             }
         }
