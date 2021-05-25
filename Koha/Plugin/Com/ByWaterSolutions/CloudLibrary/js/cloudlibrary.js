@@ -155,7 +155,11 @@ $(document).ready(function(){
     //Fetches status info for OPAC results page
     if( $("body#results").length > 0 ) {
         if( $(".loggedinusername").length == 0 ){
-            $("a[href*='ebook.yourcloudlibrary.com']").closest('td').find('.availability').html('<td class="item_status"><span class="action">Login to see Cloud Availability</span></td>');
+            var cloud_login = $("a[href*='ebook.yourcloudlibrary.com']").closest('td').find('.availability');
+            cloud_login.html('<td class="item_status"><span class="action"><button type="button">Login to see Cloud Availability</span></button></td>');
+            cloud_login.on('click',function(){
+                $("#loginModal").modal("show");
+            });
         } else {
             var item_ids = "";
             var counter = 0;
