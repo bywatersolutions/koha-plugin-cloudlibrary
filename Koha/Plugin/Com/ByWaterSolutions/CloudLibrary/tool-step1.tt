@@ -1,15 +1,15 @@
 [% INCLUDE 'doc-head-open.inc' %]
- <title>Koha: Bibliotheca plugin: Get Records Tool</title>
+ <title>Koha: CloudLibrary plugin: Get Records Tool</title>
 [% INCLUDE 'doc-head-close.inc' %]
 </head>
 <body>
 [% INCLUDE 'header.inc' %]
 [% INCLUDE 'cat-search.inc' %]
 
-<div id="breadcrumbs"><a href="/cgi-bin/koha/mainpage.pl">Home</a> &rsaquo; <a href="/cgi-bin/koha/plugins/plugins-home.pl">Plugins</a> &rsaquo; Bibliotheca &rsaquo; <a href="/cgi-bin/koha/plugins/run.pl?class=Koha::Plugin::Com::ByWaterSolutions::Bibliotheca&method=tool">Get Records Tool</a></div>
+<div id="breadcrumbs"><a href="/cgi-bin/koha/mainpage.pl">Home</a> &rsaquo; <a href="/cgi-bin/koha/plugins/plugins-home.pl">Plugins</a> &rsaquo; CloudLibrary &rsaquo; <a href="/cgi-bin/koha/plugins/run.pl?class=Koha::Plugin::Com::ByWaterSolutions::CloudLibrary&method=tool">Get Records Tool</a></div>
 
 <div id="doc3">
-    <p>This is a tool for fetching or deleting records from 3m Cloud.</p>
+    <p>This is a tool for fetching or deleting records from CloudLibrary.</p>
 
     [% IF deleted %]<p>[% deleted %] records have been removed</p>[% END %]
     [% IF problems %]
@@ -46,8 +46,8 @@
 <script>
 //Returns item info, most importantly link and cover
 function CloudFetchRecords(offset,start_date) {
-    params = { offset: offset, start_date: start_date, action: 'fetch_records',};
-    $.get("/plugin/Koha/Plugin/Com/ByWaterSolutions/Bibliotheca/fetch_records.pl",params,function(data){
+    params = { offset: offset, start_date: start_date, limit: "50",};
+    $.get("/api/v1/contrib/cloudlibrary/fetch_records",params,function(data){
         }).done(function(data){
             if ( data > 0 ){
                 $("#records_processed").append("<p>processed "+data+" records</p>");
@@ -56,7 +56,7 @@ function CloudFetchRecords(offset,start_date) {
                 CloudFetchRecords(offset, start_date);
             } else {
                 $("#records_processed").append('<p>completed</p>');
-                $("#records_processed").append('<a href="/cgi-bin/koha/plugins/run.pl?class=Koha::Plugin::Com::ByWaterSolutions::Bibliotheca&method=tool">Fetch more records</a>');
+                $("#records_processed").append('<a href="/cgi-bin/koha/plugins/run.pl?class=Koha::Plugin::Com::ByWaterSolutions::CloudLibrary&method=tool">Fetch more records</a>');
                 $('.cloud_fetch_records').hide();
 
             }
@@ -71,7 +71,7 @@ $(document).ready(function(){
         var offset = 1;
         var start_date = $("#start_date").val();
         CloudFetchRecords(offset,start_date);
-        $(".cloud_fetch_records").html('<img src=\"[% interface %]/[% theme %]/img/spinner-small.gif\" alt=\"\" />');
+        $(".cloud_fetch_records").html('<img src=\"/api/v1/contrib/cloudlibrary/static/img/spinner-small.gif\" alt=\"\" />');
     });
 });
 </script>

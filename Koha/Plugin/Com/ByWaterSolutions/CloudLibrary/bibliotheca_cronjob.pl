@@ -3,7 +3,7 @@
 use Modern::Perl;
 
 use Koha::Plugins;
-use Koha::Plugin::Com::ByWaterSolutions::Bibliotheca;
+use Koha::Plugin::Com::ByWaterSolutions::CloudLibrary;
 use Getopt::Long;
 
 =head1 NAME
@@ -11,6 +11,9 @@ use Getopt::Long;
 bibliotheca_cronjob.pl - As part of the Bibliotheca plugin this cronjob will automate fetching new records
 from the 3m account setup in the plugin. It will fetch records since the last run date unless a start date is provided.
 Each run will store the current date as the last run
+
+#### THIS CRON IS DEPRECATED AND ONLY EXISTS TO EASE IN MOVING FROM BIBLIOTHECA TO CLOUDLIBRARY PLUGIN #####
+# Please update your crons to use the new cloudlibrary_cronjob.pl
 
 =head1 SYNOPSIS
 
@@ -53,7 +56,7 @@ GetOptions(
     ) or pad2usage(2);
 pod2usage(2) if $help;
 
-my $plugin = Koha::Plugin::Com::ByWaterSolutions::Bibliotheca->new();
+my $plugin = Koha::Plugin::Com::ByWaterSolutions::CloudLibrary->new();
 my $limit = 50; #FIXME make option instead of hardcoded
 my $offset = 1;
 

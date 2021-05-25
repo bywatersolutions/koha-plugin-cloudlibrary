@@ -1,7 +1,7 @@
 //Return some item info for display
 function CloudItemInfo(item_ids) {
-    params = { item_ids: item_ids, action: 'info',};
-    $.get("/plugin/Koha/Plugin/Com/ByWaterSolutions/Bibliotheca/item_actions.pl",params,function(data){
+    params = { item_ids: item_ids };
+    $.get("/api/v1/contrib/cloudlibrary/item_info",params,function(data){
         }).done(function(data){
             $(data).find('DocumentData').each(function(){
                 var item_id = $(this).find('id').text();
@@ -17,9 +17,9 @@ function CloudItemInfo(item_ids) {
 }
 
 //Returns item info, most importantly link and cover
-function CloudIsbnInfo(item_isbns) {
-    params = { item_ids: item_isbns, action: 'isbn_info',};
-    $.get("/plugin/Koha/Plugin/Com/ByWaterSolutions/Bibliotheca/item_actions.pl",params,function(data){
+function CloudIsbnSummary(item_isbns) {
+    params = { item_ids: item_isbns };
+    $.get("/api/v1/contrib/cloudlibrary/isbn_summary",params,function(data){
         }).done(function(data){
             $(data).find('LibraryDocumentSummary').each(function(){
                 var item_id = $(this).find('id').text();
@@ -28,6 +28,9 @@ function CloudIsbnInfo(item_isbns) {
                 var item_cover = $(this).find('coverimage').text();
                 var item_isbn = $(this).find('isbn').text();
                 var item_link = $(this).find('itemlink').text();
+                if( our_cloud_name ){
+                    item_link = "https://ebook.yourcloudlibrary.com/library/"+our_cloud_name+"-document_id-"+item_id;
+                }
                 $('#'+item_id).children('.detail').html('<a href="'+item_link+'" class="cloud_cover" id="'+item_isbn+'" target="_blank"><img style="max-height:150px;" src='+item_cover+' /></a>' );
             });
         }).fail(function(data){
@@ -37,10 +40,9 @@ function CloudIsbnInfo(item_isbns) {
 
 //Returns availability of item for a patron
 function CloudItemStatus(item_ids) {
-    params = { item_ids: item_ids, action: 'status',};
-    $.get("/plugin/Koha/Plugin/Com/ByWaterSolutions/Bibliotheca/item_actions.pl",params,function(data){
+    params = { item_ids: item_ids };
+    $.get("/api/v1/contrib/cloudlibrary/item_status",params,function(data){
         }).done(function(data){
-            console.log( data );
             if( $(data).find('DocumentStatus').length == 0 ) {
                 $('.item_status').html('Error fetching availability - please see library for assistance');
                 return;
@@ -70,11 +72,11 @@ function CloudItemStatus(item_ids) {
 
 //Returns library availability of item 
 function CloudItemSummary(item_ids) {
-    params = { item_ids: item_ids, action: 'summary',};
-    $.get("/plugin/Koha/Plugin/Com/ByWaterSolutions/Bibliotheca/item_actions.pl",params,function(data){
+    params = { item_ids: item_ids };
+    $.get("/api/v1/contrib/cloudlibrary/item_summary",params,function(data){
         }).done(function(data){
-            console.log( data );
             if( $(data).find('LibraryDocumentSummary').length == 0 ) {
+                console.log('Cloud library error response:', data );
                 $('.item_status').html('Error fetching availability - please see library for assistance');
                 return;
             }
@@ -92,18 +94,17 @@ function CloudItemSummary(item_ids) {
                 });
             });
         }).fail(function(data){
-            console.log('failure');
+            console.log('Cloud library item_summary failure');
             console.log(data)
         });
 }
 
 // This function calls for the patron status, then gets item status and info for each checkout/hold
 function GetPatronInfo(){
-    $.get("/plugin/Koha/Plugin/Com/ByWaterSolutions/Bibliotheca/patron_info.pl",function(data){
+    $.get("/api/v1/contrib/cloudlibrary/patron_info",function(data){
         }).done(function(data){
             var item_ids="";
             var item_isbns="";
-            console.log( data );
             if( $(data).find('Checkouts').find('Item').length > 0 ){
                 $("#content-3m").append('<h1>Checkouts</h1><div class="span12 container-fluid" id="cloud_checkouts"></div>');
                 $(data).find('Checkouts').find('Item').each(function(){
@@ -117,7 +118,7 @@ function GetPatronInfo(){
             if( $(data).find('Holds').find('Item').length > 0 ){
                 $("#content-3m").append('<h1>Holds</h1><div class="span12 container-fluid" id="cloud_holds"></div>');
                 $(data).find('Holds').find('Item').each(function(){
-                    $("#cloud_holds").append('<div class="col span2 cloud_items" id="'+$(this).find('ItemId').text()+'" holddate="'+$(this).find('EventStartDateInUTC').text()+'" holdedate="'+$(this).find('EventEndDateInUTC').text()+'"><span class="action"></span><span class="detail"></span></div>');
+                    $("#cloud_holds").append('<div class="col span2 cloud_items" id="'+$(this).find('ItemId').text()+'" holddate="'+$(this).find('EventStartDateInUTC').text()+'" holdedate="'+$(this).find('EventEndDateInUTC').text()+'"><span class="detail"></span></br><span class="action"></span></div>');
                     item_ids += $(this).find('ItemId').text()+",";
                     item_isbns += $(this).find('ISBN').text()+",";
                 });
@@ -135,7 +136,7 @@ function GetPatronInfo(){
                 $("#content-3m").append('<h1>Holds ready to checkout</h1><ul id="cloud_holds"><li>No holds ready for checkout</li></ul>');
             }
             if( item_ids.length > 0 ) {CloudItemStatus( item_ids.slice(0,-1) );}
-            if( item_isbns.length > 0 ) {CloudIsbnInfo( item_isbns.slice(0,-1) );}
+            if( item_isbns.length > 0 ) {CloudIsbnSummary( item_isbns.slice(0,-1) );}
         }).fail(function(data){
             console.log(data);
         });
@@ -153,7 +154,6 @@ $(document).ready(function(){
 
     //Fetches status info for OPAC results page
     if( $("body#results").length > 0 ) {
-    console.log("ok");
         if( $(".loggedinusername").length == 0 ){
             $("a[href*='ebook.yourcloudlibrary.com']").closest('td').find('.availability').html('<td class="item_status"><span class="action">Login to see Cloud Availability</span></td>');
         } else {
@@ -162,7 +162,7 @@ $(document).ready(function(){
             $("a[href*='ebook.yourcloudlibrary.com']").each(function(){
                 var cloud_id = $(this).attr('href').split('-').pop().split('&').shift();
                 console.log( cloud_id );
-                $(this).closest('td').find('.availability').html('<td id="'+cloud_id+'" class="item_status" ><span class="action"><img src="/plugin/Koha/Plugin/Com/ByWaterSolutions/Bibliotheca/img/spinner-small.gif"> Fetching 3M Cloud availability</span><span class="detail"></span></td>');
+                $(this).closest('td').find('.availability').html('<td id="'+cloud_id+'" class="item_status" ><span class="action"><img src="/api/v1/contrib/cloudlibrary/static/img/spinner-small.gif"> Fetching 3M Cloud availability</span><span class="detail"></span></td>');
                 item_ids += cloud_id+",";
                 counter++;
                 if(counter >= 25){
@@ -181,7 +181,7 @@ $(document).ready(function(){
         var counter = 0;
         $("a[href*='ebook.yourcloudlibrary.com']").each(function(){
             var cloud_id = $(this).attr('href').split('-').pop().split('&').shift();
-            $(this).closest('td').append('<span id="'+cloud_id+'" class="results_summary item_status" ><span class="cloud_copies"><img src="/plugin/Koha/Plugin/Com/ByWaterSolutions/Bibliotheca/img/spinner-small.gif"> Fetching 3M Cloud availability</span><span class="detail"></span></td>');
+            $(this).closest('td').append('<span id="'+cloud_id+'" class="results_summary item_status" ><span class="cloud_copies"><img src="/api/v1/contrib/cloudlibrary/static/img/spinner-small.gif"> Fetching 3M Cloud availability</span><span class="detail"></span></td>');
             item_ids += cloud_id+",";
             counter++;
             if(counter >= 25){
@@ -199,7 +199,7 @@ $(document).ready(function(){
         var counter = 0;
         $("a[href*='ebook.yourcloudlibrary.com']").each(function(){
             var cloud_id = $(this).attr('href').split('-').pop().split('&').shift();
-            $("#holdings").append('<h3>CloudLibrary item(s)</h3><span id="'+cloud_id+'" class="results_summary item_status" ><span class="cloud_copies"><img src="/plugin/Koha/Plugin/Com/ByWaterSolutions/Bibliotheca/img/spinner-small.gif"> Fetching 3M Cloud availability</span><span class="detail"></span></td>');
+            $("#holdings").append('<h3>CloudLibrary item(s)</h3><span id="'+cloud_id+'" class="results_summary item_status" ><span class="cloud_copies"><img src="/api/v1/contrib/cloudlibrary/static/img/spinner-small.gif"> Fetching 3M Cloud availability</span><span class="detail"></span></td>');
             item_ids += cloud_id+",";
             counter++;
             if(counter >= 25){
@@ -219,7 +219,7 @@ $(document).ready(function(){
                 $("#holdings").append('<h3>Login to see CloudLibrary Availability</h3>');
             } else {
                 var cloud_id = cloud_link.attr('href').split('-').pop().split('&').shift();
-                $("#holdings").append('<h3>CloudLibrary item(s)</h3><span id="'+cloud_id+'" class="item_status" ><span class="action"><img src="/plugin/Koha/Plugin/Com/ByWaterSolutions/Bibliotheca/img/spinner-small.gif"> Fetching 3M Cloud Availability</span><span class="detail"></span></span>');
+                $("#holdings").append('<h3>CloudLibrary item(s)</h3><span id="'+cloud_id+'" class="item_status" ><span class="action"><img src="/api/v1/contrib/cloudlibrary/static/img/spinner-small.gif"> Fetching 3M Cloud Availability</span><span class="detail"></span></span>');
                 CloudItemStatus( cloud_id );
             }
         }
@@ -229,21 +229,20 @@ $(document).ready(function(){
     $(document).on('click',".cloud_action",function(){
         var item_id = $(this).val();
         var action = $(this).attr('action');
-        $(this).parent("span.action").html('<img src="/plugin/Koha/Plugin/Com/ByWaterSolutions/Bibliotheca/img/spinner-small.gif">');
+        $(this).parent("span.action").html('<img src="/api/v1/contrib/cloudlibrary/static/img/spinner-small.gif">');
         $('#'+item_id).children('.detail').text("");
-        var params = {
-            action : action,
-            item_id : $(this).val(),
-        };
-        $.get("/plugin/Koha/Plugin/Com/ByWaterSolutions/Bibliotheca/cloud_actions.pl",params,function(data){
+        var params = {};
+        $.get("/api/v1/contrib/cloudlibrary/"+action+"/"+item_id,params,function(data){
         }).done(function(data){
             CloudItemStatus( item_id );
             if ( action == 'checkout')   {
-                //$('#'+item_id).children('.detail').text( $(data).find('DueDateInUTC').text() );
                 alert('Item checked out, due:'+$(data).find('DueDateInUTC').text() );
             }
-            if ( action == 'place_hold') { $('#'+item_id).children('.detail').text( $(data).find('AvailabilityDateInUTC').text() ); }
+            if ( action == 'place_hold') {
+                $('#'+item_id).children('.detail').text( $(data).find('AvailabilityDateInUTC').text() );
+            }
             if( action == 'checkin' && $("#opac-user").length > 0 ) { $('div#'+item_id).remove(); }
+            if( action == 'cancel_hold' && $("#opac-user").length > 0 ) { $('div#'+item_id).remove(); }
         }).fail(function(){
             alert('There was an issue with this action, please try again later or contact the library if the problem persists');
         });

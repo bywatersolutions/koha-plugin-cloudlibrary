@@ -34,6 +34,10 @@
                 <td colspan="3"><input type="text" name="library_id" value="[% library_id %]" /></td>
             </tr>
             <tr>
+                <td><label for="library_name">Library Name: </label></td>
+                <td colspan="3"><input type="text" name="library_name" value="[% library_name %]" /></td>
+            </tr>
+            <tr>
                 <td><label for="record_type">Item type (code) for imported records: </label></td>
                 <td colspan="3"><input type="text" name="record_type" value="[% record_type %]" /></td>
             </tr>

@@ -1,5 +1,5 @@
 use Koha::Plugins;
-use Koha::Plugin::Com::ByWaterSolutions::Bibliotheca;
+use Koha::Plugin::Com::ByWaterSolutions::CloudLibrary;
 use Modern::Perl;
 use Getopt::Long;
 use LWP::UserAgent;
@@ -39,7 +39,7 @@ my %actions = (
 );
 
 my $uri_base = "https://partner.yourcloudlibrary.com";
-my $plugin = Koha::Plugin::Com::ByWaterSolutions::Bibliotheca->new();
+my $plugin = Koha::Plugin::Com::ByWaterSolutions::CloudLibrary->new();
 my $ua     = LWP::UserAgent->new;
 
 my $params;

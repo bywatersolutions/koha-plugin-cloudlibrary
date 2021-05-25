@@ -4,7 +4,7 @@ Koha’s Plugin System (available in Koha 3.12+) allows for you to add additiona
 
 # Downloading
 
-From the [release page](https://github.com/bywatersolutions/koha-plugin-bibliotheca/releases) you can download the relevant *.kpz file
+From the [release page](https://github.com/bywatersolutions/koha-plugin-cloudlibrary/releases) you can download the relevant *.kpz file
 
 # Installing
 
@@ -22,20 +22,16 @@ Once set up is complete you will need to alter your UseKohaPlugins system prefer
 
 # Setup
 
-You will need to add to the apache config for your site for both the staff client and opac:
-```
-   Alias /plugin/ "/var/lib/koha/kohadev/plugins/"
-   # The stanza below is needed for Apache 2.4+
-   <Directory /var/lib/koha/kohadev/plugins/>
-         Options Indexes FollowSymLinks
-         AllowOverride None
-         Require all granted
-         Options +ExecCGI
-         AddHandler cgi-script .pl
-    </Directory>
-```
+Once installed this plugin will need to be configured with data supplied by CloudLibrary:
+* Client ID:
+* Client Secret:
+* Library ID:
+* Library Name: (used to build links to your collection, if left blank links will be supplied via CloudLibrary and may have varying URLs in a consortium)
+Item type (code) for imported records:
+* ID to send to Cloud Library: ( Default: cardnumber) Cardnumber / UserID / PatronAttribute
 
+The tool method for this plugin allows the user to directly harvest from CloudLibrary - by default it will fetch from the last date fetched, or user can supply a date
 
 There is also a command line/cronjob option for fetching records.
-You can add the 'bibliotheca_cronjob.pl' to your cron tab. 
+You can add the 'cloudlibrary_cronjob.pl' to your cron tab. 
 If no --date option is provided it wil fetch records since the last run. See the script for more details.

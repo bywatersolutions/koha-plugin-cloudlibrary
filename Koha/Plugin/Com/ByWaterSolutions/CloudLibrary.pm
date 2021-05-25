@@ -1,4 +1,4 @@
-package Koha::Plugin::Com::ByWaterSolutions::Bibliotheca;
+package Koha::Plugin::Com::ByWaterSolutions::CloudLibrary;
 
 ## It's good practive to use Modern::Perl
 use Modern::Perl;
@@ -8,6 +8,7 @@ use base qw(Koha::Plugins::Base);
 
 ## We will also need to include any Koha libraries we want to access
 use C4::Context;
+use C4::Installer;
 use C4::Members;
 use C4::Auth;
 use C4::Biblio;
@@ -33,20 +34,21 @@ use XML::Simple;
 use List::MoreUtils qw(uniq);
 use HTML::Entities;
 use Text::Unidecode;
+use JSON;
 
 ## Here we set our plugin version
 our $VERSION = "{VERSION}";
 
 ## Here is our metadata, some keys are required, some are optional
 our $metadata = {
-    name            => 'Bibliotheca eBook Plugin',
+    name            => 'CloudLibrary eBook Plugin',
     author          => 'Nick Clemens',
     date_authored   => '2018-01-09',
     date_updated    => "1900-01-01",
     minimum_version => '16.0600018',
     maximum_version => undef,
     version         => $VERSION,
-    description     => 'This plugin utilises the Bibliotheca Cloud Library API',
+    description     => 'This plugin utilises the Cloud Library API',
 };
 
 our $uri_base = "https://partner.yourcloudlibrary.com";
@@ -66,18 +68,21 @@ sub new {
     return $self;
 }
 
-# Included but not implemented in Koha yet
 sub intranet_js {
     my ( $self ) = @_;
-    return q|<script>var our_cloud_lib = "| . $self->retrieve_data('library_id') . q|";</script>
-             <script src="/plugin/Koha/Plugin/Com/ByWaterSolutions/Bibliotheca/js/cloudlibrary.js"></script>
+    return q|
+        <script>var our_cloud_lib = "| . $self->retrieve_data('library_id') . q|";</script>
+        <script>var our_cloud_name = "| . $self->retrieve_data('library_name') . q|";</script>
+        <script src="/api/v1/contrib/cloudlibrary/static/js/cloudlibrary.js"></script>
     |;
 }
 
 sub opac_js {
     my ( $self ) = @_;
-    return q|<script>var our_cloud_lib = "| . $self->retrieve_data('library_id') . q|";</script>
-             <script src="/plugin/Koha/Plugin/Com/ByWaterSolutions/Bibliotheca/js/cloudlibrary.js"></script>
+    return q|
+        <script>var our_cloud_lib = "| . $self->retrieve_data('library_id') . q|";</script>
+        <script>var our_cloud_name = "| . $self->retrieve_data('library_name') . q|";</script>
+        <script src="/api/v1/contrib/cloudlibrary/static/js/cloudlibrary.js"></script>
     |;
 }
 
@@ -112,6 +117,7 @@ sub configure {
             client_id       => $self->retrieve_data('client_id'),
             client_secret   => $self->retrieve_data('client_secret'),
             library_id      => $self->retrieve_data('library_id'),
+            library_name    => $self->retrieve_data('library_name'),
             record_type     => $self->retrieve_data('record_type'),
             cloud_id        => $self->retrieve_data('cloud_id'),
         );
@@ -125,6 +131,7 @@ sub configure {
                 client_id       => $cgi->param('client_id'),
                 client_secret   => $cgi->param('client_secret'),
                 library_id      => $cgi->param('library_id'),
+                library_name    => $cgi->param('library_name'),
                 record_type     => $cgi->param('record_type'),
                 cloud_id        => $cgi->param('cloud_id'),
                 cloud_attr      => $cgi->param('cloud_attr'),
@@ -138,149 +145,124 @@ sub install() {
     my ( $self, $args ) = @_;
 
     my $table = $self->get_qualified_table_name('records');
-    my $table2 = $self->get_qualified_table_name('details');
     my $success = 0;
 
-    $success = C4::Context->dbh->do( "
+    $success = C4::Context->dbh->do("
         CREATE TABLE IF NOT EXISTS $table (
             item_id VARCHAR( 32 ) NOT NULL,
             metadata longtext NOT NULL,
             biblionumber INT(10) NOT NULL
         ) ENGINE = InnoDB;
+    ");
+    return unless $success;
+    $success = 0;
+    if( TableExists( 'koha_plugin_com_bywatersolutions_bibliotheca_records' ) ){
+        $success = C4::Context->dbh->do("
+            INSERT INTO $table SELECT * FROM koha_plugin_com_bywatersolutions_bibliotheca_records;
         ");
-    return 0 unless $success;
-    $success = C4::Context->dbh->do( "
-        CREATE TABLE IF NOT EXISTS $table2 (
-            item_id VARCHAR( 32 ) NOT NULL,
-            title mediumtext,
-            subtitle mediumtext,
-            isbn mediumtext,
-            author mediumtext,
-            publisher mediumtext,
-            publishdate text,
-            publishyear smallint(6),
-            format VARCHAR(16),
-            language VARCHAR(16),
-            rating VARCHAR(16),
-            description mediumtext,
-            size decimal(28,6),
-            pages int(11),
-            coverimage varchar(255)
-        ) ENGINE = InnoDB;
-      " );
-      return $success;
+    }
+    return unless $success;
+    $success = 0;
+    $success = C4::Context->dbh->do(q{
+        INSERT INTO plugin_data SELECT "Koha::Plugin::Com::ByWaterSolutions::CloudLibrary", plugin_key, plugin_value
+        FROM plugin_data
+        WHERE
+            plugin_class = "Koha::Plugin::Com::ByWaterSolutions::Bibliotheca" AND
+            plugin_key IN ('client_id','client_secret','cloud_attr','cloud_id','last_marc_harvest','library_id','record_type');
+    });
+    return $success;
 }
 
 sub uninstall() {
     my ( $self, $args ) = @_;
 
     my $table = $self->get_qualified_table_name('records');
-    my $table2 = $self->get_qualified_table_name('details');
 
     return C4::Context->dbh->do("DROP TABLE $table");
 }
 
-sub browse_titles {
-    my ( $self, $args ) = @_;
-    my $cgi = $self->{'cgi'};
-    my $table = $self->get_qualified_table_name('details');
-    my $offset = $cgi->param('offset') || 0;
-    my $limit = $cgi->param('limit') || 50;
-    my $template = $self->get_template({ file => 'browse_titles.tt' });
-    my $dbh = C4::Context->dbh;
-    my $sth = $dbh->prepare("SELECT * FROM $table LIMIT $limit OFFSET $offset;",{});
-    $sth->execute();
-    my $titles = $sth->fetchall_arrayref({});
-    $template->param( titles => $titles );
-    print $cgi->header();
-    print $template->output();
-}
-
-
-sub patron_info {
-    my ( $self, $args ) = @_;
-    my $cgi = $self->{'cgi'};
-
-    my ( $user, $cookie, $sessionID, $flags ) = checkauth( $cgi, 0, {}, 'opac' );
-    $user && $sessionID or response_bad_request("User not logged in");
+sub get_patron_info {
+    my ( $self, $patron ) = @_;
 
     my $ua = LWP::UserAgent->new;
-    my ($error, $verb, $uri_string) = $self->_get_request_uri({action => 'GetPatronCirculation',patron_id=>$user});
+    my ($error, $verb, $uri_string) = $self->_get_request_uri({
+        action => 'GetPatronCirculation',
+        patron => $patron
+    });
     my($dt,$auth,$vers) = $self->_get_headers( $verb, $uri_string);
     my $response = $ua->get($uri_base.$uri_string, '3mcl-Datetime' => $dt, '3mcl-Authorization' => $auth, '3mcl-APIVersion' => $vers );
-warn Data::Dumper::Dumper( $response );
 
-    print $cgi->header('text/xml');
-    print $response->{_content};
+    return $response->{_content};
 }
 
-=head2 item_info
+=head2 get_item_info
 
-item_info();
+get_item_info();
 
-=head3 Takes an array of item_ids and fetches and saves the item details
+=head3 Takes an array of item_ids and fetches the item details
 
 =cut
 
-sub item_info {
+sub get_item_info {
     my ($self, $item_ids) = @_;
-    my $cgi = $self->{'cgi'};
-    my $item_detail_xml = $self->_get_item_details( $item_ids );
+    my @item_ids = split(/,/, $item_ids);
+    warn @item_ids;
+    warn Data::Dumper::Dumper( @item_ids);
+    my $item_detail_xml = $self->_get_item_details( \@item_ids );
     if ( $item_detail_xml ) {
-        print $cgi->header();
-        print $cgi->header('text/xml');
-        print $item_detail_xml;
+        return $item_detail_xml;
     }
 }
 
 sub get_item_summary {
-    my ( $self, $args ) = @_;
-    my $cgi = $self->{'cgi'};
-    my @item_ids = split(/,/, $cgi->param('item_ids'));
+    my ( $self, $item_ids ) = @_;
+    my @item_ids = split(/,/, $item_ids);
     my $ua = LWP::UserAgent->new;
-    my ($error, $verb, $uri_string) = $self->_get_request_uri({action => 'GetItemSummary',item_ids=>\@item_ids});
+    my ($error, $verb, $uri_string) = $self->_get_request_uri({
+        action => 'GetItemSummary',
+        item_ids => \@item_ids
+    });
     my($dt,$auth,$vers) = $self->_get_headers( $verb, $uri_string);
     my $response = $ua->get($uri_base.$uri_string, '3mcl-Datetime' => $dt, '3mcl-Authorization' => $auth, '3mcl-APIVersion' => $vers);
-    print $cgi->header('text/xml');
-    print $response->{_content};
+    return $response->{_content};
 }
 
 sub get_item_status {
-    my ( $self, $args ) = @_;
-    my $cgi = $self->{'cgi'};
-    my @item_ids = split(/,/, $cgi->param('item_ids'));
-    my ( $user, $cookie, $sessionID, $flags ) = checkauth( $cgi, 0, {}, 'opac' );
-    $user && $sessionID or response_bad_request("User not logged in");
+    my ( $self, $patron, $item_ids ) = @_;
+    my @item_ids = split(/,/, $item_ids);
     my $ua = LWP::UserAgent->new;
-    my ($error, $verb, $uri_string) = $self->_get_request_uri({action => 'GetItemStatus',patron_id=>$user,item_ids=>\@item_ids});
+    my ($error, $verb, $uri_string) = $self->_get_request_uri({
+        action => 'GetItemStatus',
+        patron => $patron,
+        item_ids => \@item_ids
+    });
     my($dt,$auth,$vers) = $self->_get_headers( $verb, $uri_string);
     my $response = $ua->get($uri_base.$uri_string, '3mcl-Datetime' => $dt, '3mcl-Authorization' => $auth, '3mcl-APIVersion' => $vers);
-    print $cgi->header('text/xml');
-    print $response->{_content};
+    return $response->{_content};
 }
 
-sub get_isbn_status {
-    my ( $self, $args ) = @_;
-    my $cgi = $self->{'cgi'};
-    my @item_isbns = split(/,/, $cgi->param('item_ids'));
-    my ( $user, $cookie, $sessionID, $flags ) = checkauth( $cgi, 0, {}, 'opac' );
-    $user && $sessionID or response_bad_request("User not logged in");
+sub get_isbn_summary {
+    my ( $self, $item_ids ) = @_;
+    my @item_isbns = split(/,/, $item_ids);
     my $ua = LWP::UserAgent->new;
-    my ($error, $verb, $uri_string) = $self->_get_request_uri({action => 'GetIsbnSummary',patron_id=>$user,item_isbns=>\@item_isbns});
+    my ($error, $verb, $uri_string) = $self->_get_request_uri({
+        action => 'GetIsbnSummary',
+        item_isbns=>\@item_isbns
+    });
     my($dt,$auth,$vers) = $self->_get_headers( $verb, $uri_string);
     my $response = $ua->get($uri_base.$uri_string, '3mcl-Datetime' => $dt, '3mcl-Authorization' => $auth, '3mcl-APIVersion' => $vers);
-    print $cgi->header('text/xml');
-    print $response->{_content};
+    warn Data::Dumper::Dumper( $response );
+    return $response->{_content};
 }
 
 sub checkin {
-    my ( $self, $args ) = @_;
-    my $cgi = $self->{'cgi'};
-    my $item_id = $cgi->param('item_id');
-    my ( $user, $cookie, $sessionID, $flags ) = checkauth( $cgi, 0, {}, 'opac' );
-    $user && $sessionID or response_bad_request("User not logged in");
+    my ( $self, $patron, $item_id ) = @_;
     my $ua = LWP::UserAgent->new;
-    my ($error, $verb, $uri_string,$cloud_id) = $self->_get_request_uri({action => 'Checkin',patron_id=>$user,item_id=>$item_id});
+    my ($error, $verb, $uri_string,$cloud_id) = $self->_get_request_uri({
+        action => 'Checkin',
+        patron => $patron,
+        item_id => $item_id
+    });
     my($dt,$auth,$vers) = $self->_get_headers( $verb, $uri_string);
     my $content = "<CheckinRequest><ItemId>$item_id</ItemId><PatronId>$cloud_id</PatronId></CheckinRequest>";
     my $response = $ua->post(
@@ -291,18 +273,18 @@ sub checkin {
         'Content-type'=>'application/xml',
         'Content' => $content
     );
-    print $cgi->header();
-    print $response->{_content};
+    return $response->{_content};
 }
 
 sub checkout {
-    my ( $self, $args ) = @_;
-    my $cgi = $self->{'cgi'};
-    my $item_id = $cgi->param('item_id');
-    my ( $user, $cookie, $sessionID, $flags ) = checkauth( $cgi, 0, {}, 'opac' );
-    $user && $sessionID or response_bad_request("User not logged in");
+    my ( $self, $patron, $item_id ) = @_;
     my $ua = LWP::UserAgent->new;
-    my ($error, $verb, $uri_string,$cloud_id) = $self->_get_request_uri({action => 'Checkout',patron_id=>$user,item_id=>$item_id});
+
+    my ($error, $verb, $uri_string,$cloud_id) = $self->_get_request_uri({
+        action => 'Checkout',
+        patron => $patron,
+        item_id => $item_id
+    });
     my($dt,$auth,$vers) = $self->_get_headers( $verb, $uri_string);
     my $content = "<CheckoutRequest><ItemId>$item_id</ItemId><PatronId>$cloud_id</PatronId></CheckoutRequest>";
     my $response = $ua->post(
@@ -313,18 +295,17 @@ sub checkout {
         'Content-type'=>'application/xml',
         'Content' => $content
     );
-    print $cgi->header();
-    print $response->{_content};
+    return $response->{_content};
 }
 
 sub place_hold {
-    my ( $self, $args ) = @_;
-    my $cgi = $self->{'cgi'};
-    my $item_id = $cgi->param('item_id');
-    my ( $user, $cookie, $sessionID, $flags ) = checkauth( $cgi, 0, {}, 'opac' );
-    $user && $sessionID or response_bad_request("User not logged in");
+    my ( $self, $patron, $item_id ) = @_;
     my $ua = LWP::UserAgent->new;
-    my ($error, $verb, $uri_string,$cloud_id) = $self->_get_request_uri({action => 'PlaceHold',patron_id=>$user,item_id=>$item_id});
+    my ($error, $verb, $uri_string,$cloud_id) = $self->_get_request_uri({
+        action  => 'PlaceHold',
+        patron  => $patron,
+        item_id => $item_id
+    });
     my($dt,$auth,$vers) = $self->_get_headers( $verb, $uri_string);
     my $content = "<PlaceHoldRequest><ItemId>$item_id</ItemId><PatronId>$cloud_id</PatronId></PlaceHoldRequest>";
     my $response = $ua->put(
@@ -335,18 +316,17 @@ sub place_hold {
         'Content-type'=>'application/xml',
         'Content' => $content
     );
-    print $cgi->header();
-    print $response->{_content};
+    return $response->{_content};
 }
 
 sub cancel_hold {
-    my ( $self, $args ) = @_;
-    my $cgi = $self->{'cgi'};
-    my $item_id = $cgi->param('item_id');
-    my ( $user, $cookie, $sessionID, $flags ) = checkauth( $cgi, 0, {}, 'opac' );
-    $user && $sessionID or response_bad_request("User not logged in");
+    my ( $self, $patron, $item_id ) = @_;
     my $ua = LWP::UserAgent->new;
-    my ($error, $verb, $uri_string,$cloud_id) = $self->_get_request_uri({action => 'CancelHold',patron_id=>$user,item_id=>$item_id});
+    my ($error, $verb, $uri_string,$cloud_id) = $self->_get_request_uri({
+        action  => 'CancelHold',
+        patron  => $patron,
+        item_id => $item_id
+    });
     my($dt,$auth,$vers) = $self->_get_headers( $verb, $uri_string);
     my $content = "<CancelHoldRequest><ItemId>$item_id</ItemId><PatronId>$cloud_id</PatronId></CancelHoldRequest>";
     my $response = $ua->post(
@@ -357,23 +337,33 @@ sub cancel_hold {
         'Content-type'=>'application/xml',
         'Content' => $content
     );
-    print $cgi->header();
-    print $response->{_content};
+    return $response->{_content};
 }
 
 sub fetch_records {
     my ( $self, $args ) = @_;
-    my $cgi = $self->{'cgi'};
-    my $start_date = $cgi ? $cgi->param('start_date') : $args->{start_date} // $self->retrieve_data('last_marc_harvest');
-    my $limit = $cgi ? $cgi->param('limit') : $args->{limit} // 50;
-    my $offset = $cgi ? $cgi->param('offset') : $args->{offset} // 999999;
-    $self->store_data({'last_marc_harvest' => output_pref({dt=>dt_from_string(),dateonly=>1,dateformat=>'sql'})});
+    my $start_date = $args->{start_date} // $self->retrieve_data('last_marc_harvest');
+    my $limit = $args->{limit} // 50;
+    my $offset = $args->{offset} // 999999;
+    $self->store_data({
+        'last_marc_harvest' => output_pref({
+            dt=>dt_from_string(),
+            dateonly=>1,
+            dateformat=>'sql'
+        })
+    });
 
     my $ua = LWP::UserAgent->new;
     my ($error, $verb, $uri_string) = $self->_get_request_uri({action => 'GetMARC', start_date=>$start_date});
     my $offset_string = "&offset=$offset&limit=$limit";
     my($dt,$auth,$vers) = $self->_get_headers( $verb, $uri_string.$offset_string);
-    my $response = $ua->get($uri_base.$uri_string.$offset_string, 'Date' => $dt ,'3mcl-Datetime' => $dt, '3mcl-Authorization' => $auth, '3mcl-APIVersion' => $vers );
+    my $response = $ua->get(
+        $uri_base.$uri_string.$offset_string,
+        'Date' => $dt,
+        '3mcl-Datetime' => $dt,
+        '3mcl-Authorization' => $auth,
+        '3mcl-APIVersion' => $vers
+    );
     if ( $response->is_success && $response->{_content} ) {
         my $tmp = File::Temp->new();
         print $tmp $response->{_content};
@@ -391,14 +381,10 @@ sub fetch_records {
             push ( @item_ids, $self->_save_record( $marc ) ) if $marc;
         } while ( $marc );
         close $tmp;
-        print $cgi->header() if $cgi;
         my $items_processed = scalar uniq @item_ids;
-        print "$items_processed";
-        return scalar @item_ids unless $cgi;
+        return scalar @item_ids;
     } else {
-        print $cgi->header() if $cgi;
-        print "No data in response";
-        return 0 unless $cgi;
+        return 0;
     }
 }
 
@@ -464,6 +450,7 @@ sub _save_record {
     my $table = $self->get_qualified_table_name('records');
     my $item_id = $record->field('001')->as_string();
     return unless $item_id;
+    my $item_url = $record->subfield('856',"u");
     my $dbh = C4::Context->dbh;
     my $sth = $dbh->prepare("SELECT biblionumber FROM $table WHERE item_id='$item_id';");
     $sth->execute();
@@ -475,13 +462,14 @@ sub _save_record {
     $sth->execute($item_id);
     my $saved_record = $dbh->do(
         qq{
-            INSERT INTO $table ( item_id, metadata, biblionumber )
-            VALUES ( ?, ?, ? );
+            INSERT INTO $table ( item_id, metadata, biblionumber, item_url )
+            VALUES ( ?, ?, ?, ? );
         },
         {},
         $item_id,
         $record->as_xml_record('MARC21'),
-        $biblionumber
+        $biblionumber,
+        $item_url
     );
     return $item_id;
 }
@@ -490,62 +478,19 @@ sub _save_record {
 
 _get_item_details(@item_ids);
 
-=head3 Takes an array of iitem_ids and fetches the detail XML from the API
+=head3 Takes an array of item_ids and fetches the detail XML from the API
 
 =cut
 
 sub _get_item_details {
     my ($self, $item_ids) = @_;
+    warn ref $item_ids;
     my ($error, $verb, $uri_string) = $self->_get_request_uri({action=>'GetItemData',item_ids=>$item_ids});
     my $ua = LWP::UserAgent->new;
     my($dt,$auth,$vers) = $self->_get_headers( $verb, $uri_string);
     my $response = $ua->get($uri_base.$uri_string, 'Date' => $dt ,'3mcl-Datetime' => $dt, '3mcl-Authorization' => $auth, '3mcl-APIVersion' => $vers );
     if ( $response->is_success ) {
         return( $response->{_content});
-    }
-}
-
-
-
-
-=head2 _save_item_details
-
-_save_item_details(@item_ids);
-
-=head3 Takes an array of item_ids and fetches and saves the item details
-
-=cut
-
-sub _save_item_details {
-    my ($self, $item_ids) = @_;
-    my $item_detail_xml = $self->_get_item_details( $item_ids );
-    if ( $item_detail_xml ) {
-        my $item_details = XMLin( $item_detail_xml, ForceArray => 1 )->{DocumentData};
-        my $table = $self->get_qualified_table_name('details');
-        my $dbh = C4::Context->dbh;
-        foreach my $item_detail ( @$item_details ) {
-            $dbh->do("DELETE FROM $table WHERE item_id = '".$item_detail->{id}[0]."';");
-            my $saved_details = $dbh->do(
-                "
-                    INSERT INTO $table ( item_id, title, subtitle, isbn, author, publisher,
-                            publishdate, publishyear, format, language, rating, description )
-                    VALUES ( ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ? );
-                ",
-                {},
-                $item_detail->{id}[0],
-                $item_detail->{title}[0],
-                $item_detail->{subtitle}[0],
-                $item_detail->{isbn}[0],
-                $item_detail->{author}[0],
-                $item_detail->{publisher}[0],
-                $item_detail->{publishdate}[0],
-                $item_detail->{publishyear}[0],
-                $item_detail->{format}[0],
-                $item_detail->{language}[0],
-                $item_detail->{rating}[0],
-                $item_detail->{description}[0],
-            );
-        }
     }
 }
 
@@ -575,20 +520,18 @@ sub _get_request_uri {
     my $action_uri;
 
     my $cloud_id;
-    my $patron_id = $params->{patron_id};
+    my $patron = $params->{patron};
     my $cloud_identifier = $self->retrieve_data('cloud_id');
-    if ( $patron_id && $cloud_identifier ne 'userid'){
-        my $patron = Koha::Patrons->find({ userid => $patron_id });
-        if ( $patron ){
-            if( $cloud_identifier eq 'cardnumber') {
-                $cloud_id = $patron->cardnumber;
-            } elsif ( $cloud_identifier eq 'patron_attr') {
-                my $the_attr = $patron->extended_attributes->find({ code => $self->retrieve_data('cloud_attr') });
-                $cloud_id = $the_attr->attribute if $the_attr;
-            }
+
+    if( $patron ){
+        if( $cloud_identifier eq 'userid'){
+            $cloud_id = $patron->userid
+        } elsif( $cloud_identifier eq 'cardnumber') {
+            $cloud_id = $patron->cardnumber;
+        } elsif ( $cloud_identifier eq 'patron_attr') {
+            my $the_attr = $patron->extended_attributes->find({ code => $self->retrieve_data('cloud_attr') });
+            $cloud_id = $the_attr->attribute if $the_attr;
         }
-    } else {
-        $cloud_id = $patron_id;
     }
 
     if ($action eq 'GetMARC') {
@@ -692,5 +635,28 @@ sub response {
 }
 
 
+sub api_routes {
+    my ( $self, $args ) = @_;
+
+    my $spec_str = $self->mbf_read('openapi.json');
+    my $spec     = decode_json($spec_str);
+
+    return $spec;
+}
+
+sub static_routes {
+    my ( $self, $args ) = @_;
+
+    my $spec_str = $self->mbf_read('staticapi.json');
+    my $spec     = decode_json($spec_str);
+
+    return $spec;
+}
+
+sub api_namespace {
+    my ($self) = @_;
+
+    return "cloudlibrary";
+}
 
 1;

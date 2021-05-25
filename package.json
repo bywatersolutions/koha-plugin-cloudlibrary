@@ -1,8 +1,8 @@
 {
-  "name": "koha-plugin-bibliotheca",
+  "name": "koha-plugin-cloudlibrary",
   "version": "2.1.34",
   "previous_version": "2.1.33",
-  "description": "Koha Bibliotheca Plugin",
+  "description": "Koha CloudLibrary Plugin",
   "devDependencies": {
     "gulp": "^3.9.1",
     "gulp-cli": "^1.2.2",
@@ -14,14 +14,14 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/bywatersolutions/koha-plugin-bibliotheca.git"
+    "url": "git+https://github.com/bywatersolutions/koha-plugin-cloudlibrary.git"
   },
   "author": "Kyle M Hall <kyle@bywatersolutions.com>",
   "license": "GPL-3.0",
   "bugs": {
-    "url": "https://github.com/bywatersolutions/koha-plugin-bibliotheca/issues"
+    "url": "https://github.com/bywatersolutions/koha-plugin-cloudlibrary/issues"
   },
-  "homepage": "https://github.com/bywatersolutions/koha-plugin-bibliotheca#readme",
+  "homepage": "https://github.com/bywatersolutions/koha-plugin-cloudlibrary#readme",
   "dependencies": {
     "datetime": "0.0.3",
     "jsonfile": "^4.0.0",
