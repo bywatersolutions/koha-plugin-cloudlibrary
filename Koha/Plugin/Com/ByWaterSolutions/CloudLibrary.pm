@@ -155,8 +155,8 @@ sub install() {
         ) ENGINE = InnoDB;
     ");
     return unless $success;
-    $success = 0;
     if( TableExists( 'koha_plugin_com_bywatersolutions_bibliotheca_records' ) ){
+        $success = 0;
         $success = C4::Context->dbh->do("
             INSERT INTO $table SELECT * FROM koha_plugin_com_bywatersolutions_bibliotheca_records;
         ");
@@ -450,7 +450,6 @@ sub _save_record {
     my $table = $self->get_qualified_table_name('records');
     my $item_id = $record->field('001')->as_string();
     return unless $item_id;
-    my $item_url = $record->subfield('856',"u");
     my $dbh = C4::Context->dbh;
     my $sth = $dbh->prepare("SELECT biblionumber FROM $table WHERE item_id='$item_id';");
     $sth->execute();
@@ -462,14 +461,13 @@ sub _save_record {
     $sth->execute($item_id);
     my $saved_record = $dbh->do(
         qq{
-            INSERT INTO $table ( item_id, metadata, biblionumber, item_url )
-            VALUES ( ?, ?, ?, ? );
+            INSERT INTO $table ( item_id, metadata, biblionumber )
+            VALUES ( ?, ?, ? );
         },
         {},
         $item_id,
         $record->as_xml_record('MARC21'),
         $biblionumber,
-        $item_url
     );
     return $item_id;
 }

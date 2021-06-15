@@ -50,16 +50,18 @@ function CloudItemStatus(item_ids) {
             $(data).find('DocumentStatus').each(function(){
                 var item_id = $(this).find('id').text();
                 var item_status = $(this).find('status').text();
-                if( item_status == "CAN_LOAN" ){
-                    $('#'+item_id).children('.action').html('<button type="button" class="cloud_action" action="checkout" value='+item_id+'>Checkout</button');
+                if( item_status == "CAN_LOAN"){
+                    $('#'+item_id).children('.action').html('<button type="button" class="cloud_action" action="checkout" value='+item_id+'>Checkout</button>');
                 } else if ( item_status == "CAN_HOLD") {
-                    $('#'+item_id).children('.action').html('<button type="button" class="cloud_action" action="place_hold" value='+item_id+'>Place hold</button');
+                    $('#'+item_id).children('.action').html('<button type="button" class="cloud_action" action="place_hold" value='+item_id+'>Place hold</button>');
                 } else if ( item_status == "HOLD") {
-                    $('#'+item_id).children('.action').html('<button type="button" class="cloud_action" action="cancel_hold" value='+item_id+'>Cancel hold</button');
+                    $('#'+item_id).children('.action').html('<button type="button" class="cloud_action" action="cancel_hold" value='+item_id+'>Cancel hold</button>');
                 } else if ( item_status == "LOAN") {
-                    $('#'+item_id).children('.action').html('Item is checked out <button type="button" class="cloud_action" action="checkin" value='+item_id+'>Return</button');
+                    $('#'+item_id).children('.action').html('Item is checked out <button type="button" class="cloud_action" action="checkin" value='+item_id+'>Return</button>');
                 } else if ( item_status == "RESERVATION") {
-                    $('#'+item_id).children('.action').html('<button type="button" class="cloud_action" action="checkout" value='+item_id+'>Checkout reserve</button');
+                    $('#'+item_id).children('.action').html('<button type="button" class="cloud_action" action="checkout" value='+item_id+'>Checkout reserve</button>');
+                } else if ( item_status == "CAN_WISH") {
+                    $('#'+item_id).children('.action').html('<span value='+item_id+'>No longer available</span>');
                 } else {
                     $('#'+item_id).children('.action').text( item_status );
                 }
