@@ -13,7 +13,7 @@ use C4::Members;
 use C4::Auth;
 use C4::Biblio;
 use C4::Output qw(&output_with_http_headers);
-use Koha::DateUtils;
+use Koha::DateUtils qw(dt_from_string);
 use Koha::Libraries;
 use Koha::Patrons;
 use Koha::Patron::Categories;
