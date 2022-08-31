@@ -13,7 +13,7 @@ use C4::Members;
 use C4::Auth;
 use C4::Biblio;
 use C4::Output qw(&output_with_http_headers);
-use Koha::DateUtils qw(dt_from_string);
+use Koha::DateUtils qw(dt_from_string output_pref);
 use Koha::Libraries;
 use Koha::Patrons;
 use Koha::Patron::Categories;
@@ -446,7 +446,7 @@ sub _save_record {
     return unless $record;
     my $field_942 = MARC::Field->new( 942, '', '', 'c' => $self->retrieve_data("record_type") );
     $record->append_fields($field_942);
-    my ($biblionumber,$biblioitemnumber) = AddBiblio($record,"");
+    my ($biblionumber,$biblioitemnumber) = C4::Biblio::AddBiblio($record,"");
     my $table = $self->get_qualified_table_name('records');
     my $item_id = $record->field('001')->as_string();
     return unless $item_id;
@@ -455,7 +455,7 @@ sub _save_record {
     $sth->execute();
     my $biblionumbers = $sth->fetchall_arrayref();
     foreach my $biblionumber (@$biblionumbers){
-        DelBiblio(@$biblionumber[0]);
+        C4::Biblio::DelBiblio(@$biblionumber[0]);
     }
     $sth = $dbh->prepare("DELETE FROM $table WHERE item_id=?");
     $sth->execute($item_id);
