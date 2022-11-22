@@ -148,9 +148,9 @@ $(document).ready(function(){
 
     //Creates and populates the 3m Checkouts tab on patron summary on OPAC
     if( $("body#opac-user").length > 0 ) {
-        $("#opac-user-views ul").append('<li><a href="#opac-user-cloudlibrary">Cloud Library Account</a></li>');
-        $("#opac-user-views").append('<div id="opac-user-cloudlibrary"><div id="content-3m">Search the catalog to find and place holds or checkout Cloud Library items. Click the covers to visit the Cloud Library site and login to download items or get the apps</div></div>');
-        $('#opac-user-views').tabs("refresh");
+        $("#opac-user-views ul").append('<li><a href="#opac-user-cloudlibrary" class="nav-link" data-toggle="tab" role="tab" aria-controls="opac-user-cloudlibrary">Cloud Library Account</a></li>');
+        $("#opac-user-views .tab-content").append('<div id="opac-user-cloudlibrary" class="tab-pane" role="tabplanel" aria-labelledby="opac-user-cloudlibrary"><div id="content-3m">Search the catalog to find and place holds or checkout Cloud Library items. Click the covers to visit the Cloud Library site and login to download items or get the apps</div></div>');
+        //$('#opac-user-views').tabs("refresh");
         GetPatronInfo();
     }
 
