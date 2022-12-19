@@ -399,7 +399,7 @@ sub delete_records {
     $sth->execute();
     my $records = $sth->fetchall_arrayref();
     foreach my $record (@$records){
-        my $error = DelBiblio(@$record[0]);
+        my $error = C4::Biblio::DelBiblio(@$record[0]);
         if( $error ) {
             push @problems, @$record[0];
             next;
